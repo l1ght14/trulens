@@ -4684,6 +4684,120 @@ class LLMProvider(core_provider.Provider):
             temperature=temperature,
         )
 
+    def role_adherence(
+        self,
+        records: Union[List[Any], str],
+        role: str,
+        temperature: float = 0.0,
+        *,
+        additional_instructions: Optional[str] = None,
+    ) -> float:
+        """
+        Uses chat completion model. A function that completes a template to
+        evaluate role adherence across a multi-turn conversation.
+
+        Example:
+            ```python
+            from trulens.core import Metric
+            feedback = Metric(
+                implementation=provider.role_adherence,
+                name="Role Adherence",
+                additional_instructions=additional_instructions,
+            ).with_arguments(
+                role="A math tutor who guides with questions and never states the final answer."
+            ).on_conversation()
+            ```
+
+        Args:
+            records (Union[List[Any], str]): The ordered conversation records, or a transcript string.
+            role (str): The role or persona the assistant is expected to stay in. Required.
+            temperature (float): The temperature for the LLM response, which might have impact on the confidence level of the evaluation. Defaults to 0.0.
+            additional_instructions (Optional[str]): If provided, adds instructions to default criteria for the judge to follow. Defaults to None.
+
+        Returns:
+            float: A value between 0.0 (role broken throughout) and 1.0 (role held throughout).
+        """
+        from trulens.feedback.templates import (
+            conversation as templates_conversation,
+        )
+
+        if not role or not role.strip():
+            raise ValueError("role is required for role_adherence.")
+
+        transcript = templates_conversation.conversation_to_prompt(records)
+        system_prompt = self._build_criteria_with_instructions(
+            criteria=None,
+            default_criteria=templates_conversation.RoleAdherence.system_prompt_template.format(
+                role=role
+            ),
+            additional_instructions=additional_instructions,
+        )
+        return self.generate_score(
+            system_prompt=system_prompt,
+            user_prompt=f"Conversation Transcript:\n{transcript}",
+            min_score_val=0,
+            max_score_val=3,
+            temperature=temperature,
+        )
+
+    def role_adherence_with_cot_reasons(
+        self,
+        records: Union[List[Any], str],
+        role: str,
+        temperature: float = 0.0,
+        *,
+        additional_instructions: Optional[str] = None,
+    ) -> Tuple[float, Dict]:
+        """
+        Uses chat completion model. A function that completes a template to
+        evaluate role adherence across a multi-turn conversation. Also uses
+        chain of thought methodology and emits the reasons.
+
+        Example:
+            ```python
+            from trulens.core import Metric
+            feedback = Metric(
+                implementation=provider.role_adherence_with_cot_reasons,
+                name="Role Adherence",
+                additional_instructions=additional_instructions,
+            ).with_arguments(
+                role="A math tutor who guides with questions and never states the final answer."
+            ).on_conversation()
+            ```
+
+        Args:
+            records (Union[List[Any], str]): The ordered conversation records, or a transcript string.
+            role (str): The role or persona the assistant is expected to stay in. Required.
+            temperature (float): The temperature for the LLM response, which might have impact on the confidence level of the evaluation. Defaults to 0.0.
+            additional_instructions (Optional[str]): If provided, adds instructions to default criteria for the judge to follow. Defaults to None.
+
+        Returns:
+            Tuple[float, Dict]: A tuple containing a value between 0.0 (role broken throughout) and 1.0 (role held throughout) and a dictionary containing the reasons for the evaluation.
+        """
+        from trulens.feedback.templates import (
+            conversation as templates_conversation,
+        )
+
+        if not role or not role.strip():
+            raise ValueError("role is required for role_adherence_with_cot_reasons.")
+
+        transcript = templates_conversation.conversation_to_prompt(records)
+        system_prompt = self._build_criteria_with_instructions(
+            criteria=None,
+            default_criteria=templates_conversation.RoleAdherence.system_prompt_template.format(
+                role=role
+            ),
+            additional_instructions=additional_instructions,
+        )
+        return self.generate_score_and_reasons(
+            system_prompt=system_prompt,
+            user_prompt=f"Conversation Transcript:\n{transcript}"
+            + templates_base.COT_REASONS_TEMPLATE,
+            min_score_val=0,
+            max_score_val=3,
+            temperature=temperature,
+        )
+
     def agent_goal_accuracy(
         self,
         records: Union[List[Any], str],

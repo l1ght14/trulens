@@ -12,6 +12,7 @@ __all__ = [
     "AgentGoalAccuracy",
     "CoherenceAcrossTurns",
     "ConversationHelpfulness",
+    "RoleAdherence",
     "TopicAdherence",
     "conversation_to_prompt",
 ]
@@ -101,6 +102,40 @@ class TopicAdherence(Semantics, CriteriaOutputSpaceMixin):
         1: Barely touches the topics with major deviations.
         2: Mostly adheres with minor tangents.
         3: Strongly adheres throughout the conversation.
+
+        Respond ONLY with a single integer score from {LIKERT_0_3_PROMPT}.
+        """
+    )
+
+
+class RoleAdherence(Semantics, CriteriaOutputSpaceMixin):
+    """Evaluates whether the assistant stayed in its assigned role."""
+
+    criteria: ClassVar[str] = (
+        "Does the assistant stay consistent with its assigned role or persona?"
+    )
+    output_space_prompt: ClassVar[str] = LIKERT_0_3_PROMPT
+    output_space: ClassVar[str] = OutputSpace.LIKERT_0_3.name
+    system_prompt_template: ClassVar[str] = cleandoc(
+        f"""
+        You are evaluating ROLE ADHERENCE in a multi-turn conversation between a
+        User and an AI Assistant. The assistant has been assigned the role:
+        {{role}}
+
+        Judge only the lines that begin with "Assistant:" - the user's turns are
+        context, never something to score. Take earlier turns as context: an
+        assistant that has already broken the role may be judged on whether it
+        recovers, but do not retroactively excuse an earlier break.
+
+        Decide which assistant turns violate the role, then score on a scale of
+        0 to 3, where the scale describes how many turns broke:
+        0: Every assistant turn broke the role.
+        1: Most assistant turns broke the role.
+        2: At most one assistant turn broke the role.
+        3: Every assistant turn stayed in role.
+
+        If the transcript contains fewer than one assistant turn, score 0 - there
+        is nothing to adhere to.
 
         Respond ONLY with a single integer score from {LIKERT_0_3_PROMPT}.
         """
